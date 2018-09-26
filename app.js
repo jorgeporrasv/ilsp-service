@@ -1,14 +1,27 @@
 var amqp = require('amqplib/callback_api');
-var consumer = process.env.RABBITMQ_PORT_5672_TCP_ADDR || "amqp://localhost";
 
-amqp.connect(consumer, (err, conn)=>{
-    conn.createChannel(function(err, ch){
+var rabbitmq_user = process.argv[0];
+var rabbitmq_passw = process.argv[1];
+var rabbitmq = process.argv[2];
 
-        ch.assertQueue(q, {durable: false});
-        console.log('[*] Mensajes: %s.', q);
+function start() {
+    amqp.connect('amqp://'+rabbitmq_user+':'+rabbitmq_passw+'@'+rabbitmq, function(err, conn) {
+        conn.createChannel(function(err, channel) {
+            var ex='logs';
 
-        ch.consume(q, function(msg){
-            console.log("[x] %s", msg.content.toString());
-        }, {noAck:true});
+            channel.assertExchange(ex, 'fanout', {durable:false});
+            var queueNombre = process.argv[3];
+
+            channel.assertQueue(queueNombre, {exclusive:true}, function(error, q) {
+                channel.bindQueue(q.queue, ex, queueNombre);
+
+                channel.consume(q.queue, function(mensaje) {
+                    console.log("%s", mensaje.content.toString());
+                }, {noAck:true});
+            });
+        })
     });
-})
+}
+
+start();
+
